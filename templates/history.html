@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>练习历史记录 - 数学练习生成器</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .daily-summary {
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            margin-bottom: 15px;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .daily-summary-details {
+            display: flex;
+            gap: 20px;
+        }
+        .worksheet {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            margin-bottom: 20px;
+            padding: 15px;
+        }
+        .problems-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .problems-table th, .problems-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .section-title {
+            margin-top: 30px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+        #chart-container {
+            display: none;
+            margin-top: 20px;
+        }
+        #chart-toggle {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .correct { color: green; }
+        .incorrect { color: red; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="/">返回主页</a>
+        <span>欢迎，{{ current_user.username }}</span>
+        <a href="/logout">退出登录</a>
+    </div>
+
+    <h1>练习历史记录</h1>
+
+    <button id="chart-toggle">显示练习统计图表</button>
+
+    <div id="chart-container">
+        <canvas id="history-chart"></canvas>
+    </div>
+
+    <h2 class="section-title">每日练习汇总</h2>
+    {% if daily_history %}
+        {% for day in daily_history %}
+        <div class="daily-summary">
+            <h3><a href="{{ url_for('daily_worksheet_history', date=day.date) }}">{{ day.date }}</a></h3>
+            <div class="daily-summary-details">
+                <span>练习次数：{{ day.worksheet_count }} 次</span>
+                <span>总题数：{{ day.total_problems }} 题</span>
+                <span>正确率：{{ day.accuracy }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p>暂无练习记录</p>
+    {% endif %}
+
+    <h2 class="section-title">详细练习记录</h2>
+    {% if history %}
+        {% for worksheet in history %}
+        <div class="worksheet">
+            <div class="worksheet-header">
+                <span>练习时间：{{ worksheet.created_at }}</span>
+                <span>总题数：{{ worksheet.total_problems }} | 正确题数：{{ worksheet.correct_problems }} | 正确率：{{ worksheet.accuracy }} | 用时：{{ worksheet.total_time }}秒</span>
+            </div>
+            <table class="problems-table">
+                <thead>
+                    <tr>
+                        <th>题目</th>
+                        <th>你的答案</th>
+                        <th>正确答案</th>
+                        <th>是否正确</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for problem in worksheet.problems %}
+                    <tr>
+                        <td>{{ problem.problem }}</td>
+                        <td>{{ problem.user_answer }}</td>
+                        <td>{{ problem.correct_answer }}</td>
+                        <td class="{{ 'correct' if problem.is_correct else 'incorrect' }}">
+                            {{ '✓' if problem.is_correct else '✗' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p>暂无详细练习记录</p>
+    {% endif %}
+
+    <script>
+        const chartToggle = document.getElementById('chart-toggle');
+        const chartContainer = document.getElementById('chart-container');
+        let chartLoaded = false;
+
+        chartToggle.addEventListener('click', function() {
+            if (!chartLoaded) {
+                fetch('/history/chart_data')
+                    .then(response => response.json())
+                    .then(data => {
+                        const ctx = document.getElementById('history-chart').getContext('2d');
+                        new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: data.labels,
+                                datasets: [
+                                    {
+                                        label: '每日总题数',
+                                        data: data.total_problems,
+                                        borderColor: 'blue',
+                                        backgroundColor: 'rgba(0, 0, 255, 0.1)',
+                                        yAxisID: 'y1'
+                                    },
+                                    {
+                                        label: '正确率(%)',
+                                        data: data.accuracy_rates,
+                                        borderColor: 'green',
+                                        backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                                        yAxisID: 'y2'
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                interaction: {
+                                    mode: 'index',
+                                    intersect: false
+                                },
+                                scales: {
+                                    y1: {
+                                        type: 'linear',
+                                        display: true,
+                                        position: 'left',
+                                        title: {
+                                            display: true,
+                                            text: '总题数'
+                                        }
+                                    },
+                                    y2: {
+                                        type: 'linear',
+                                        display: true,
+                                        position: 'right',
+                                        title: {
+                                            display: true,
+                                            text: '正确率(%)'
+                                        },
+                                        grid: {
+                                            drawOnChartArea: false
+                                        }
+                                    }
+                                },
+                                plugins: {
+                                    title: {
+                                        display: true,
+                                        text: '最近30天练习统计'
+                                    }
+                                }
+                            }
+                        });
+                        chartLoaded = true;
+                    });
+            }
+            
+            // 切换图表显示
+            if (chartContainer.style.display === 'none' || chartContainer.style.display === '') {
+                chartContainer.style.display = 'block';
+                chartToggle.textContent = '隐藏练习统计图表';
+            } else {
+                chartContainer.style.display = 'none';
+                chartToggle.textContent = '显示练习统计图表';
+            }
+        });
+    </script>
+</body>
+</html>

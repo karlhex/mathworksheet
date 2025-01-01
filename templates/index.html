@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>数学练习生成器</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        input, button {
+            margin: 10px;
+            padding: 10px;
+            font-size: 16px;
+        }
+        #problem-container, #result-container {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        #results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        #results-table th, #results-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        #timer {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin: 10px 0;
+        }
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .incorrect-answer {
+            border: 1px solid red;
+        }
+        
+        .problem-display {
+            font-size: 4rem;  /* 大幅增加字体大小 */
+            font-weight: bold;
+            color: #007bff;  /* 鲜明的蓝色 */
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);  /* 轻微阴影增加立体感 */
+            letter-spacing: 5px;  /* 增加字母间距 */
+            transition: all 0.3s ease;  /* 平滑过渡效果 */
+        }
+        
+        .problem-display:hover {
+            transform: scale(1.05);  /* 悬停时轻微放大 */
+            color: #0056b3;  /* 悬停时颜色变深 */
+        }
+        
+        .form-control-lg {
+            font-size: 2rem;  /* 答案输入框也变大 */
+        }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        {% if current_user.is_authenticated %}
+        <span>欢迎，{{ current_user.username }}</span>
+        <div>
+            <a href="/history">练习历史</a>
+            <a href="/logout">退出登录</a>
+        </div>
+        {% else %}
+        <a href="/login">登录</a>
+        <a href="/signup">注册</a>
+        {% endif %}
+    </div>
+
+    {% if current_user.is_authenticated %}
+    <div id="setup-container">
+        <h1>数学练习生成器</h1>
+        <label>练习数量：</label>
+        <input type="number" id="num-problems" min="1" max="50" value="10">
+        <label>最大数：</label>
+        <input type="number" id="max-number" min="1" max="1000" value="100">
+        <div>
+            <label>选择运算符：</label>
+            <label>
+                <input type="checkbox" name="operation" value="+" checked> 加法
+            </label>
+            <label>
+                <input type="checkbox" name="operation" value="-" checked> 减法
+            </label>
+            <label>
+                <input type="checkbox" name="operation" value="*" checked> 乘法
+            </label>
+            <label>
+                <input type="checkbox" name="operation" value="/" checked> 除法
+            </label>
+        </div>
+        <div>
+            <label>
+                <input type="checkbox" id="allow-negative"> 允许负数结果
+            </label>
+        </div>
+        <button onclick="startWorksheet()">开始练习</button>
+    </div>
+
+    <div id="problem-container" style="display:none;">
+        <div class="container mt-5">
+            <div class="row justify-content-center">
+                <div class="col-md-8">
+                    <div class="card shadow-lg">
+                        <div class="card-body text-center">
+                            <h1 class="display-4 mb-4 text-primary problem-display" id="problem-text"></h1>
+                            
+                            <form id="answerForm" class="mt-4">
+                                <div class="input-group input-group-lg">
+                                    <input type="text" 
+                                           id="user-answer" 
+                                           class="form-control form-control-lg text-center" 
+                                           placeholder="输入你的答案" 
+                                           pattern="^-?\d+(\.\d+)?$" 
+                                           required>
+                                    <div class="input-group-append">
+                                        <button type="submit" class="btn btn-primary btn-lg" onclick="checkAnswer()">提交</button>
+                                    </div>
+                                </div>
+                            </form>
+                            
+                            <div id="resultDisplay" class="mt-3 h4"></div>
+                            
+                            <div class="progress mt-3" style="height: 5px;">
+                                <div id="progressBar" class="progress-bar bg-success" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            
+                            <div class="mt-3">
+                                <span id="problemCounter" class="text-muted">第 <span id="current-problem-number">1</span> / <span id="total-problems"></span> 题</span>
+                            </div>
+                            <div id="timer" class="mt-3">00:00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="result-container" style="display:none;">
+        <h2>练习结果</h2>
+        <p>总题数：<span id="total-result"></span></p>
+        <p>正确题数：<span id="correct-result"></span></p>
+        <p>总用时：<span id="total-time"></span></p>
+        <table id="results-table">
+            <thead>
+                <tr>
+                    <th>题目</th>
+                    <th>你的答案</th>
+                    <th>正确答案</th>
+                    <th>是否正确</th>
+                </tr>
+            </thead>
+            <tbody id="results-body"></tbody>
+        </table>
+    </div>
+    {% else %}
+    <div>
+        <h1>欢迎使用数学练习生成器</h1>
+        <p>请先 <a href="/login">登录</a> 或 <a href="/signup">注册</a></p>
+    </div>
+    {% endif %}
+
+    <script>
+        let startTime, timerInterval, totalSeconds = 0;
+
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+
+        function updateTimer() {
+            totalSeconds = Math.floor((Date.now() - startTime) / 1000);
+            document.getElementById('timer').textContent = formatTime(totalSeconds);
+        }
+
+        function startTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+        }
+
+        function startWorksheet() {
+            const numProblems = document.getElementById('num-problems').value;
+            const maxNumber = document.getElementById('max-number').value;
+            const operations = Array.from(document.querySelectorAll('input[name="operation"]:checked')).map(checkbox => checkbox.value);
+            const allowNegative = document.getElementById('allow-negative').checked;
+
+            fetch('/start_worksheet', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    num_problems: numProblems,
+                    max_number: maxNumber,
+                    operations: operations,
+                    allow_negative: allowNegative
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('setup-container').style.display = 'none';
+                document.getElementById('problem-container').style.display = 'block';
+                document.getElementById('problem-text').textContent = data.problem;
+                document.getElementById('total-problems').textContent = data.total_problems;
+                document.getElementById('current-problem-number').textContent = 1;
+                
+                // 启动计时器
+                startTimer();
+            });
+        }
+
+        function checkAnswer() {
+            const userAnswer = document.getElementById('user-answer').value;
+            const userAnswerInput = document.getElementById('user-answer');
+            
+            fetch('/check_answer', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    answer: userAnswer
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.next_problem) {
+                    // 移除之前的错误样式
+                    userAnswerInput.classList.remove('incorrect-answer');
+                    
+                    // 更新题目
+                    document.getElementById('problem-text').textContent = data.next_problem;
+                    document.getElementById('current-problem-number').textContent = data.current_problem_number;
+                    
+                    // 清空输入框
+                    userAnswerInput.value = '';
+                    userAnswerInput.focus();
+                }
+                else if (data.completed) {
+                    // 停止计时器
+                    stopTimer();
+
+                    // 显示最终结果
+                    document.getElementById('problem-container').style.display = 'none';
+                    document.getElementById('result-container').style.display = 'block';
+                    document.getElementById('total-result').textContent = data.total_problems;
+                    document.getElementById('correct-result').textContent = data.correct_count;
+                    document.getElementById('total-time').textContent = formatTime(totalSeconds);
+
+                    // 填充结果表格
+                    const resultsBody = document.getElementById('results-body');
+                    resultsBody.innerHTML = ''; // 清空之前的结果
+                    data.problems.forEach(problem => {
+                        const row = resultsBody.insertRow();
+                        row.insertCell(0).textContent = problem.problem;
+                        row.insertCell(1).textContent = problem.user_answer;
+                        row.insertCell(2).textContent = problem.correct_answer;
+                        const resultCell = row.insertCell(3);
+                        resultCell.textContent = problem.is_correct ? '✓' : '✗';
+                        if (!problem.is_correct) {
+                            resultCell.style.color = 'red';
+                        }
+                    });
+                }
+                else if (data.incorrect) {
+                    userAnswerInput.classList.add('incorrect-answer');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+
+        // 添加回车键事件监听器
+        const userAnswerInput = document.getElementById('user-answer');
+        userAnswerInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // 阻止默认的回车行为
+                checkAnswer();
+            }
+        });
+
+        // 添加输入验证，只允许数字输入
+        userAnswerInput.addEventListener('input', function(event) {
+            // 移除非数字字符
+            this.value = this.value.replace(/[^0-9-]/g, '');
+        });
+    </script>
+</body>
+</html>

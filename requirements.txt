@@ -1,0 +1,9 @@
+flask==2.3.2
+flask-sqlalchemy==3.1.1
+flask-login==0.6.3
+werkzeug==2.3.8
+email-validator==2.1.1
+SQLAlchemy==2.0.36
+psycopg2-binary==2.9.10
+gunicorn==21.2.0  # 生产环境 WSGI 服务器
+python-dotenv==1.0.0  # 环境变量管理
